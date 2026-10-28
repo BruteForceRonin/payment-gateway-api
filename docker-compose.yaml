@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:18-alpine       # postgres:<version>
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"         # host:container
+    volumes:
+      - pgdata:/var/lib/postgresql/18/docker   # volume_name:data_dir_in_container
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  pgweb:
+    image: sosedoff/pgweb          # sosedoff/pgweb
+    ports:
+      - "5434:8081"        # pgweb listens on 8081 inside its container
+    environment:
+      PGWEB_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+
+    depends_on:
+        db:
+            condition: service_healthy
+
+    restart: unless-stopped
+
+
+
+
+volumes:
+  pgdata:                    # declare the named volume here
